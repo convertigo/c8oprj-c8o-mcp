@@ -1,0 +1,3 @@
+path: /mcp/tree
+↓GetTree [rest.GetOperation-1760700405001]:
+  targetRequestable: ConvertigoMCP.DescribeDatabaseObject
