@@ -1,74 +1,57 @@
-comment: Lists sequences available in a specific Convertigo project.
-↓buildResponse [steps.SimpleStep-1760700401001]:
+comment: List sequences for one or all projects
+↓BuildSequences [steps.SimpleStep-1760712703642]: 
   expression: |
-    var Engine = Packages.com.twinsoft.convertigo.engine.Engine;
-    var manager = Engine.theApp.databaseObjectsManager;
-
-    function toMessage(err) {
-      if (!err) {
-        return "Unknown error";
+    var manager = Packages.com.twinsoft.convertigo.engine.Engine.theApp.databaseObjectsManager;
+    var targets = [];
+    if (project && String(project).trim().length > 0) {
+      targets.push(String(project).trim());
+    } else {
+      var names = manager.getAllProjectNamesList(true);
+      var itNames = names.iterator();
+      while (itNames.hasNext()) {
+        targets.push(String(itNames.next()));
       }
-      if (err.javaException) {
-        var javaMessage = err.javaException.getMessage();
-        return String(javaMessage != null ? javaMessage : err.javaException.toString());
-      }
-      if (err.message) {
-        return String(err.message);
-      }
-      return String(err);
     }
-
-    var response;
-    var projectName = project != null ? String(project) : "";
-
-    try {
-      if (!projectName) {
-        throw new Packages.java.lang.IllegalArgumentException("Missing 'project' variable");
+    var list = [];
+    for (var i = 0; i < targets.length; i++) {
+      var name = targets[i];
+      var entry = { name: name, sequences: [] };
+      try {
+        var proj = manager.getOriginalProjectByName(name);
+        if (proj != null) {
+          var seqs = proj.getSequencesList();
+          var itSeqs = seqs.iterator();
+          while (itSeqs.hasNext()) {
+            var seq = itSeqs.next();
+            entry.sequences.push({
+              name: seq.getName(),
+              comment: seq.getComment() == null ? null : String(seq.getComment()),
+              qname: seq.getFullQName(),
+              enabled: seq.isEnabled ? seq.isEnabled() : true
+            });
+          }
+        } else {
+          entry.error = "Project not available";
+        }
+      } catch (eSeq) {
+        entry.error = String(eSeq);
       }
-      var projectObject = manager.getProjectByName(projectName);
-      if (projectObject == null) {
-        throw new Packages.com.twinsoft.convertigo.engine.EngineException(
-          "Project '" + projectName + "' cannot be opened"
-        );
-      }
-
-      var sequences = [];
-      var iterator = projectObject.getSequencesList().iterator();
-      while (iterator.hasNext()) {
-        var sequence = iterator.next();
-        var comment = sequence.getComment();
-        sequences.push({
-          name: String(sequence.getName()),
-          comment: comment != null ? String(comment) : "",
-          type: String(sequence.getClass().getName())
-        });
-      }
-
-      response = {
-        status: "ok",
-        project: projectName,
-        sequences: sequences
-      };
-    } catch (e) {
-      response = {
-        status: "error",
-        project: projectName,
-        message: toMessage(e)
-      };
+      list.push(entry);
     }
-↓output [steps.JsonToXmlStep-1760700401002]:
-  jsonObject:
-    - xmlizable:
+    var result = { projects: list };
+↓Json1 [steps.JsonToXmlStep-1760712703644]: 
+  jsonObject: 
+    - xmlizable: 
       - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
-      - SmartType:
+      - SmartType: 
         - ↑mode: JS
-        - →→: response
-  key:
-    - xmlizable:
+        - →→: result
+  key: 
+    - xmlizable: 
       - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
-      - SmartType:
+      - SmartType: 
         - ↑mode: PLAIN
-        - →→: response
-↓project [variables.RequestableVariable-1760700401003]:
-  comment: Name of the project to inspect.
-  value: ConvertigoMCP
+        - →→: projects
+↓project [variables.RequestableVariable-1760712703640]: 
+  comment: Optional project name to filter
+  wsdl: false

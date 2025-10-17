@@ -1,142 +1,115 @@
-comment: Invokes a sequence through the internal requester API and returns its response payload.
-↓invoke [steps.SimpleStep-1760700403001]:
+comment: Execute a sequence via the internal requester
+↓Invoke [steps.SimpleStep-1760712703654]: 
   expression: |
-    var InternalRequester = Packages.com.twinsoft.convertigo.engine.requesters.InternalRequester;
-    var Parameter = Packages.com.twinsoft.convertigo.engine.enums.Parameter;
-    var XMLUtils = Packages.com.twinsoft.convertigo.engine.util.XMLUtils;
-    var HashMap = Packages.java.util.HashMap;
-    var response;
-
-    function toMessage(err) {
-      if (!err) {
-        return "Unknown error";
+    function parseJson(text, fallback) {
+      if (text == null) {
+        return fallback;
       }
-      if (err.javaException) {
-        var javaMessage = err.javaException.getMessage();
-        return String(javaMessage != null ? javaMessage : err.javaException.toString());
+      var s = String(text);
+      if (s.length === 0) {
+        return fallback;
       }
-      if (err.message) {
-        return String(err.message);
+      try {
+        return JSON.parse(s);
+      } catch (e) {
+        return fallback;
       }
-      return String(err);
     }
 
-    function appendRequestParameter(map, key, value) {
-      if (!key || value === null || value === undefined) {
+    function merge(into, from) {
+      if (!from) {
         return;
       }
-      if (typeof value === 'object') {
-        map.put(String(key), JSON.stringify(value));
-      } else {
-        map.put(String(key), String(value));
+      for (var key in from) {
+        if (from.hasOwnProperty(key)) {
+          into[key] = from[key];
+        }
       }
     }
-
-    var projectName = project != null ? String(project) : "";
-    var sequenceName = sequence != null ? String(sequence) : "";
-    var payloadText = payload != null ? String(payload) : "";
-    var contextId = contextIdVar != null ? String(contextIdVar) : "";
-    var removeContextFlag = removeContext != null ? String(removeContext) : "";
-
+    var payloadData = parseJson(payload, {});
+    var inlineParams = parseJson(parameters, {});
+    var targetProject = payloadData.project || payloadData.projectName || project;
+    var targetSequence = payloadData.sequence || payloadData.sequenceName || sequence;
+    if (!targetProject || String(targetProject).trim().length === 0) {
+      throw new Error("Missing project identifier");
+    }
+    if (!targetSequence || String(targetSequence).trim().length === 0) {
+      throw new Error("Missing sequence identifier");
+    }
+    var merged = {};
+    merge(merged, payloadData.parameters);
+    merge(merged, inlineParams);
+    var request = new Packages.java.util.HashMap();
+    var Parameter = Packages.com.twinsoft.convertigo.engine.enums.Parameter;
+    request.put(Parameter.Project.getName(), String(targetProject));
+    request.put(Parameter.Sequence.getName(), String(targetSequence));
+    for (var pname in merged) {
+      if (!merged.hasOwnProperty(pname)) {
+        continue;
+      }
+      var pvalue = merged[pname];
+      if (pvalue === null || pvalue === undefined) {
+        continue;
+      }
+      if (pvalue instanceof Array) {
+        var arr = [];
+        for (var i = 0; i < pvalue.length; i++) {
+          arr.push(pvalue[i] === null || pvalue[i] === undefined ? null : String(pvalue[i]));
+        }
+        request.put(pname, Java.to(arr, Packages.java.lang.String[]));
+      } else {
+        request.put(pname, String(pvalue));
+      }
+    }
+    var InternalRequester = Packages.com.twinsoft.convertigo.engine.requesters.InternalRequester;
+    var requester = new InternalRequester(request);
+    var response = requester.processRequest();
     try {
-      if (!projectName) {
-        throw new Packages.java.lang.IllegalArgumentException("Missing 'project' variable");
-      }
-      if (!sequenceName) {
-        throw new Packages.java.lang.IllegalArgumentException("Missing 'sequence' variable");
-      }
-
-      var requestMap = new HashMap();
-      requestMap.put(Parameter.Project.getName(), projectName);
-      requestMap.put(Parameter.Sequence.getName(), sequenceName);
-      if (contextId) {
-        requestMap.put(Parameter.Context.getName(), contextId);
-      }
-      if (removeContextFlag) {
-        requestMap.put(Parameter.RemoveContext.getName(), removeContextFlag);
-      }
-
-      if (payloadText) {
-        try {
-          var parsed = JSON.parse(payloadText);
-          for (var key in parsed) {
-            if (Object.prototype.hasOwnProperty.call(parsed, key)) {
-              appendRequestParameter(requestMap, key, parsed[key]);
-            }
-          }
-        } catch (parseError) {
-          throw new Packages.java.lang.IllegalArgumentException("Invalid JSON payload: " + parseError.message);
-        }
-      }
-
-      var requester = new InternalRequester(requestMap);
-      var raw = requester.processRequest();
-      var outputType = "unknown";
-      var outputContent = null;
-      var javaClass = "";
-
-      if (raw === null) {
-        outputType = "null";
-      } else {
-        javaClass = String(raw.getClass().getName());
-        if (raw instanceof Packages.org.w3c.dom.Document) {
-          outputType = "xml";
-          outputContent = String(XMLUtils.prettyPrintDOM(raw));
-        } else if (raw instanceof Packages.java.lang.String) {
-          outputType = "text";
-          outputContent = String(raw);
-        } else {
-          outputType = "object";
-          outputContent = String(raw);
-        }
-      }
-
-      var executionContext = requestMap.get("convertigo.context");
-      var contextIdentifier = executionContext != null ? String(executionContext.contextID) : "";
-      var contentType = requestMap.get("convertigo.contentType");
-      var cookies = requestMap.get("convertigo.cookies");
-
-      response = {
-        status: "ok",
-        project: projectName,
-        sequence: sequenceName,
-        contextId: contextIdentifier,
-        contentType: contentType != null ? String(contentType) : "",
-        cookies: cookies != null ? String(cookies) : "",
-        output: {
-          type: outputType,
-          javaClass: javaClass,
-          content: outputContent
-        }
-      };
-    } catch (e) {
-      response = {
-        status: "error",
-        project: projectName,
-        sequence: sequenceName,
-        message: toMessage(e)
-      };
+      requester.getHttpServletRequest().getSession(true).invalidate();
+    } catch (eClose) {
     }
-↓result [steps.JsonToXmlStep-1760700403002]:
-  jsonObject:
-    - xmlizable:
+    var payloadOut = null;
+    var contentType = "text/plain";
+    var DocumentClass = Packages.org.w3c.dom.Document;
+    if (response != null) {
+      if (DocumentClass.isInstance(response)) {
+        payloadOut = Packages.com.twinsoft.convertigo.engine.util.XMLUtils.prettyPrintDOM(response);
+        contentType = "application/xml";
+      } else if (response.getClass && response.getClass().isArray()) {
+        payloadOut = new java.lang.String(response, "UTF-8");
+        contentType = "application/octet-stream";
+      } else {
+        payloadOut = String(response);
+      }
+    }
+    var result = {
+      project: String(targetProject),
+      sequence: String(targetSequence),
+      contentType: contentType,
+      payload: payloadOut
+    };
+↓Json1 [steps.JsonToXmlStep-1760712703656]: 
+  jsonObject: 
+    - xmlizable: 
       - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
-      - SmartType:
+      - SmartType: 
         - ↑mode: JS
-        - →→: response
-  key:
-    - xmlizable:
+        - →→: result
+  key: 
+    - xmlizable: 
       - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
-      - SmartType:
+      - SmartType: 
         - ↑mode: PLAIN
         - →→: response
-↓project [variables.RequestableVariable-1760700403003]:
-  comment: Name of the project hosting the sequence to invoke.
-↓sequence [variables.RequestableVariable-1760700403004]:
-  comment: Name of the sequence to invoke.
-↓payload [variables.RequestableVariable-1760700403005]:
-  comment: Optional JSON object serialized as a string that contains request parameters for the target sequence.
-↓contextIdVar [variables.RequestableVariable-1760700403006]:
-  comment: Optional existing Convertigo context identifier (__context) to reuse between calls.
-↓removeContext [variables.RequestableVariable-1760700403007]:
-  comment: Optional flag forwarded to __removeContext to control Convertigo context lifecycle.
+↓project [variables.RequestableVariable-1760712703646]: 
+  comment: Optional project override
+  wsdl: false
+↓sequence [variables.RequestableVariable-1760712703648]: 
+  comment: Optional sequence override
+  wsdl: false
+↓parameters [variables.RequestableVariable-1760712703650]: 
+  comment: Optional JSON-encoded parameter map
+  wsdl: false
+↓payload [variables.RequestableVariable-1760712703652]: 
+  comment: Optional JSON payload containing project, sequence and parameters
+  wsdl: false

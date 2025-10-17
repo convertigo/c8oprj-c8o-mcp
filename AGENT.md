@@ -1,6 +1,10 @@
 You have to continue this project in order to make ConvertigoMCP interface to implement MCP interface that will help to manage a Convertigo server, invoke Convertigo requestable and modify Convertigo project.
 
-You can still try to start a Convertigo instance with Docker when the platform allows it:
+⚠️ **Never edit the YAML files by hand.**
+
+All Convertigo changes (creating sequences, updating the URL mapper, etc.) must be performed in memory through Rhino scripts executed via `/convertigo/api/exec` or the `EXEC` sequence, then exported with `Engine.theApp.databaseObjectsManager.exportProject(project)`. Do not edit the `_c8oProject/` directory directly.
+
+You can start a Convertigo instance as docker:
 
 ```
 docker run --rm -p 28080:28080 -v <project_pwd>:/workspace/projects/ConvertigoMcp -d convertigo/convertigo-ci:develop

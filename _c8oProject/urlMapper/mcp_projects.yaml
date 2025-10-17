@@ -1,0 +1,3 @@
+path: /mcp/projects
+↓GetProjects [rest.GetOperation]: 
+  targetRequestable: ConvertigoMCP.ListProjects

@@ -1,44 +1,56 @@
-comment: Returns runtime metrics about the Convertigo engine.
-↓buildMetrics [steps.SimpleStep-1760698385563]: 
+comment: Return runtime metrics for the Convertigo engine
+↓CollectMetrics [steps.SimpleStep-1760712703632]: 
   expression: |
     var runtime = java.lang.Runtime.getRuntime();
-    var Engine = Packages.com.twinsoft.convertigo.engine.Engine;
+    var mb = 1024 * 1024;
     var EngineStatistics = Packages.com.twinsoft.convertigo.engine.EngineStatistics;
-    var RequestableObject = Packages.com.twinsoft.convertigo.beans.core.RequestableObject;
     var HttpSessionListener = Packages.com.twinsoft.convertigo.engine.requesters.HttpSessionListener;
     var KeyManager = Packages.com.twinsoft.tas.KeyManager;
     var Session = Packages.com.twinsoft.api.Session;
-    var mb = 1024 * 1024;
-    var memoryTotal = runtime.totalMemory();
-    var sessionCount = HttpSessionListener.countSessions();
-    var sessionMaxCV = KeyManager.getMaxCV(Session.EmulIDSE);
+    var RequestableObject = Packages.com.twinsoft.convertigo.beans.core.RequestableObject;
     var contexts = 0;
     try {
-      contexts = Engine.isStarted ? Engine.theApp.contextManager.getNumberOfContexts() : 0;
+      contexts = Packages.com.twinsoft.convertigo.engine.Engine.isStarted
+        ? Packages.com.twinsoft.convertigo.engine.Engine.theApp.contextManager.getNumberOfContexts()
+        : 0;
     } catch (e) {
-      contexts = 0;
     }
-    var metrics = {
-      memoryMaximal: Math.floor(runtime.maxMemory() / mb),
-      memoryTotal: Math.floor(memoryTotal / mb),
-      memoryUsed: Math.floor((memoryTotal - runtime.freeMemory()) / mb),
-      threads: RequestableObject.nbCurrentWorkerThreads,
-      sessions: sessionCount,
-      sessionMaxCV: sessionMaxCV,
-      availableSessions: sessionMaxCV - sessionCount,
-      contexts: contexts,
-      requests: Math.max(EngineStatistics.getAverage(EngineStatistics.REQUEST), 0),
-      engineState: Engine.isStarted,
-      startTime: Engine.startStopDate,
+    var sessionCount = HttpSessionListener.countSessions();
+    var sessionMax = 0;
+    try {
+      sessionMax = KeyManager.getMaxCV(Session.EmulIDSE);
+    } catch (e2) {
+    }
+    var start = Packages.com.twinsoft.convertigo.engine.Engine.startStopDate;
+    var startTimeValue = null;
+    if (start != null) {
+      if (start instanceof java.util.Date) {
+        startTimeValue = start.getTime();
+      } else {
+        startTimeValue = Number(start);
+      }
+    }
+    var result = {
+      memoryMaximal: Number(runtime.maxMemory() / mb),
+      memoryTotal: Number(runtime.totalMemory() / mb),
+      memoryUsed: Number((runtime.totalMemory() - runtime.freeMemory()) / mb),
+      threads: Number(RequestableObject.nbCurrentWorkerThreads),
+      sessions: Number(sessionCount),
+      sessionMaxCV: Number(sessionMax),
+      availableSessions: Number(sessionMax > 0 ? sessionMax - sessionCount : 0),
+      contexts: Number(contexts),
+      requests: Number(Math.max(EngineStatistics.getAverage(EngineStatistics.REQUEST), 0)),
+      engineState: Packages.com.twinsoft.convertigo.engine.Engine.isStarted,
+      startTime: startTimeValue,
       time: java.lang.System.currentTimeMillis()
     };
-↓metrics [steps.JsonToXmlStep-1760698385565]: 
+↓Json1 [steps.JsonToXmlStep-1760712703634]: 
   jsonObject: 
     - xmlizable: 
       - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
       - SmartType: 
         - ↑mode: JS
-        - →→: metrics
+        - →→: result
   key: 
     - xmlizable: 
       - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType

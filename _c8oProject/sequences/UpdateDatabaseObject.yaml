@@ -1,8 +1,7 @@
-comment: Create a new database object under a parent
-↓Create [steps.SimpleStep-1760712703682]: 
+comment: Update properties of a database object
+↓Update [steps.SimpleStep-1760712703676]: 
   expression: |
     var ClassUtils = Packages.org.apache.commons.lang3.ClassUtils;
-    var IContainerOrdered = Packages.com.twinsoft.convertigo.beans.core.IContainerOrdered;
 
     function parseJson(text, fallback) {
       if (text == null) {
@@ -88,54 +87,22 @@ comment: Create a new database object under a parent
     }
 
     var data = parseJson(payload, {});
-    var parentId = data.parent || data.parentQName;
-    var className = data.className;
-    if (!parentId) {
-      throw new Error("Missing parent identifier");
-    }
-    if (!className) {
-      throw new Error("Missing className");
+    var target = data.qname || data.id;
+    if (!target || String(target).trim().length === 0) {
+      throw new Error("Missing qname");
     }
     var manager = Packages.com.twinsoft.convertigo.engine.Engine.theApp.databaseObjectsManager;
-    var parent = manager.getDatabaseObjectByQName(String(parentId));
-    if (parent == null) {
-      throw new Error("Parent database object not found");
-    }
-    var clazz = java.lang.Class.forName(String(className));
-    var dbo = clazz.getDeclaredConstructor().newInstance();
-    dbo.bNew = true;
-    if (data.name) {
-      dbo.setName(String(data.name));
+    var dbo = manager.getDatabaseObjectByQName(String(target));
+    if (dbo == null) {
+      throw new Error("Database object not found");
     }
     var updated = applyProperties(dbo, data.properties || {});
-    var afterValue = null;
-    if (data.after) {
-      var afterObj = manager.getDatabaseObjectByQName(String(data.after));
-      if (afterObj != null) {
-        afterValue = java.lang.Long.valueOf(afterObj.priority);
-      }
+    var parent = dbo.getParent();
+    if (parent != null) {
+      parent.hasChanged = true;
     }
-    if (data.before && afterValue == null) {
-      var beforeObj = manager.getDatabaseObjectByQName(String(data.before));
-      if (beforeObj != null) {
-        var previous = beforeObj.getPreviousSiblingInFolder();
-        afterValue = previous == null ? java.lang.Long.valueOf(0) : java.lang.Long.valueOf(previous.priority);
-      }
-    }
-    if (IContainerOrdered.class.isInstance(parent)) {
-      parent.add(dbo, afterValue);
-    } else {
-      parent.add(dbo);
-    }
-    dbo.hasChanged = true;
-    parent.hasChanged = true;
-    var result = {
-      qname: dbo.getFullQName(),
-      name: dbo.getName(),
-      className: className,
-      updated: updated
-    };
-↓Json1 [steps.JsonToXmlStep-1760712703684]: 
+    var result = { qname: dbo.getFullQName(), updated: updated };
+↓Json1 [steps.JsonToXmlStep-1760712703678]: 
   jsonObject: 
     - xmlizable: 
       - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
@@ -147,7 +114,7 @@ comment: Create a new database object under a parent
       - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
       - SmartType: 
         - ↑mode: PLAIN
-        - →→: created
-↓payload [variables.RequestableVariable-1760712703680]: 
-  comment: JSON payload with parent, className, optional name, properties, before/after
+        - →→: update
+↓payload [variables.RequestableVariable-1760712703674]: 
+  comment: JSON payload with qname and properties
   wsdl: false

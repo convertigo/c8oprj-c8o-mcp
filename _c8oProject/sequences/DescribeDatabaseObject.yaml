@@ -1,128 +1,106 @@
-comment: Describes a database object tree so MCP clients can inspect the logical structure of a project.
-↓describe [steps.SimpleStep-1760700404001]:
+comment: Describe a database object and optional descendants
+↓Describe [steps.SimpleStep-1760712703662]: 
   expression: |
-    var Engine = Packages.com.twinsoft.convertigo.engine.Engine;
-    var CachedIntrospector = Packages.com.twinsoft.convertigo.engine.util.CachedIntrospector;
-    var IEnableAble = Packages.com.twinsoft.convertigo.beans.core.IEnableAble;
-    var response;
-
-    function toMessage(err) {
-      if (!err) {
-        return "Unknown error";
-      }
-      if (err.javaException) {
-        var javaMessage = err.javaException.getMessage();
-        return String(javaMessage != null ? javaMessage : err.javaException.toString());
-      }
-      if (err.message) {
-        return String(err.message);
-      }
-      return String(err);
-    }
-
-    function safeString(value) {
-      return value != null ? String(value) : "";
-    }
-
-    function describeNode(dbo, depth) {
-      var beanInfo = CachedIntrospector.getBeanInfo(dbo);
-      var children = dbo.getDatabaseObjectChildren();
-      var hasChildren = children != null && !children.isEmpty();
+    function describeDatabaseObject(dbo, depth) {
       var node = {
-        qname: String(dbo.getQName()),
-        name: safeString(dbo.getName()),
-        displayName: safeString(dbo.toString()),
-        comment: safeString(dbo.getComment()),
-        category: safeString(dbo.getDatabaseType()),
-        beanClass: String(beanInfo.getBeanDescriptor().getBeanClass().getName()),
-        folderType: String(dbo.getFolderType().name()),
-        priority: Number(dbo.priority),
-        hasChildren: hasChildren,
-        childCount: hasChildren ? children.size() : 0,
-        isEnabled: dbo instanceof IEnableAble ? Boolean(dbo.isEnabled()) : true
+        qname: dbo.getQName(),
+        fullQName: dbo.getFullQName(),
+        name: dbo.getName(),
+        type: dbo.getDatabaseType(),
+        className: dbo.getClass().getName(),
+        comment: dbo.getComment(),
+        priority: Number(dbo.priority)
       };
-
-      if (depth > 0 && hasChildren) {
-        var list = [];
-        var iterator = children.iterator();
-        while (iterator.hasNext()) {
-          var child = iterator.next();
-          list.push(describeNode(child, depth - 1));
+      var parent = dbo.getParent();
+      node.parentQName = parent != null ? parent.getFullQName() : null;
+      if (Packages.com.twinsoft.convertigo.beans.core.IEnableAble.class.isInstance(dbo)) {
+        node.enabled = dbo.isEnabled();
+      }
+      try {
+        node.hasChildren = dbo.hasDatabaseObjectChildren();
+      } catch (eHas) {
+        node.hasChildren = false;
+        node.childrenError = String(eHas);
+      }
+      try {
+        var beanInfo = Packages.java.beans.Introspector.getBeanInfo(dbo.getClass());
+        var descriptors = beanInfo.getPropertyDescriptors();
+        var props = [];
+        for (var i = 0; i < descriptors.length; i++) {
+          var pd = descriptors[i];
+          var propName = pd.getName();
+          if (propName === "class" || propName === "parent") {
+            continue;
+          }
+          var getter = pd.getReadMethod();
+          var setter = pd.getWriteMethod();
+          if (getter == null || setter == null) {
+            continue;
+          }
+          var value = null;
+          try {
+            var v = getter.invoke(dbo, null);
+            if (v != null) {
+              value = String(v);
+            }
+          } catch (eGet) {
+            value = "<error>";
+          }
+          props.push({ name: propName, type: pd.getPropertyType().getName(), value: value });
         }
-        node.children = list;
+        node.properties = props;
+      } catch (eInfo) {
+        node.propertiesError = String(eInfo);
+      }
+      if (depth > 0) {
+        try {
+          var childNodes = [];
+          var children = dbo.getDatabaseObjectChildren();
+          var it = children.iterator();
+          while (it.hasNext()) {
+            var child = it.next();
+            childNodes.push(describeDatabaseObject(child, depth - 1));
+          }
+          node.children = childNodes;
+        } catch (eChildren) {
+          node.childrenError = String(eChildren);
+        }
       }
       return node;
     }
 
-    function toPositiveInteger(value, fallback) {
-      if (value === null || value === undefined || value === "") {
-        return fallback;
-      }
-      var parsed = parseInt(String(value), 10);
-      if (isNaN(parsed) || parsed < 0) {
-        return fallback;
-      }
-      return parsed;
+    if (!qname || String(qname).trim().length === 0) {
+      throw new Error("Missing qname");
     }
-
-    var qnameValue = qname != null ? String(qname) : "";
-    var depthValue = toPositiveInteger(depth, 1);
-
-    try {
-      if (depthValue > 8) {
-        depthValue = 8;
-      }
-      var manager = Engine.theApp.databaseObjectsManager;
-      if (qnameValue) {
-        var dbo = manager.getDatabaseObjectByQName(qnameValue);
-        if (dbo == null) {
-          throw new Packages.com.twinsoft.convertigo.engine.EngineException(
-            "Database object '" + qnameValue + "' cannot be found"
-          );
-        }
-        response = {
-          status: "ok",
-          depth: depthValue,
-          root: describeNode(dbo, depthValue)
-        };
-      } else {
-        var projects = [];
-        var names = manager.getAllProjectNamesList(false);
-        var iterator = names.iterator();
-        while (iterator.hasNext()) {
-          var projectName = String(iterator.next());
-          var project = manager.getProjectByName(projectName);
-          projects.push(describeNode(project, depthValue));
-        }
-        response = {
-          status: "ok",
-          depth: depthValue,
-          projects: projects
-        };
-      }
-    } catch (e) {
-      response = {
-        status: "error",
-        depth: depthValue,
-        qname: qnameValue,
-        message: toMessage(e)
-      };
+    var manager = Packages.com.twinsoft.convertigo.engine.Engine.theApp.databaseObjectsManager;
+    var dbo = manager.getDatabaseObjectByQName(String(qname));
+    if (dbo == null) {
+      throw new Error("Database object not found: " + qname);
     }
-↓result [steps.JsonToXmlStep-1760700404002]:
-  jsonObject:
-    - xmlizable:
+    var depthValue = 1;
+    if (depth && String(depth).length > 0) {
+      try {
+        depthValue = java.lang.Integer.parseInt(String(depth));
+      } catch (eDepth) {
+      }
+    }
+    var result = { node: describeDatabaseObject(dbo, depthValue) };
+↓Json1 [steps.JsonToXmlStep-1760712703664]: 
+  jsonObject: 
+    - xmlizable: 
       - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
-      - SmartType:
+      - SmartType: 
         - ↑mode: JS
-        - →→: response
-  key:
-    - xmlizable:
+        - →→: result
+  key: 
+    - xmlizable: 
       - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
-      - SmartType:
+      - SmartType: 
         - ↑mode: PLAIN
-        - →→: response
-↓qname [variables.RequestableVariable-1760700404003]:
-  comment: Optional qualified name of the database object to inspect. When omitted, the sequence describes all projects.
-↓depth [variables.RequestableVariable-1760700404004]:
-  comment: Optional recursion depth for children enumeration (defaults to 1, maximum 8).
-  value: "1"
+        - →→: node
+↓qname [variables.RequestableVariable-1760712703658]: 
+  comment: Qualified name of the database object
+  wsdl: false
+↓depth [variables.RequestableVariable-1760712703660]: 
+  comment: Depth of child traversal
+  wsdl: false
