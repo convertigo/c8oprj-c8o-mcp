@@ -1,0 +1,8 @@
+↑convertigo: 8.0.0.m006
+↓ConvertigoMCP [core.Project]: 
+  comment: Mashup Sequencer project
+  contextTimeout: 59
+  corsOrigin: =Origin
+  httpSessionTimeout: 60
+  ↓void [connectors.SqlConnector]: 🗏 connectors/void.yaml
+  ↓NewSequence [sequences.GenericSequence]: 🗏 sequences/NewSequence.yaml
