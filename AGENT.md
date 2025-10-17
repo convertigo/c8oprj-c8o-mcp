@@ -77,6 +77,10 @@ You can extend the project dynamically through Rhino code executed via the `EXEC
 
 Convertigo accepts these changes without a server restart. Remember to commit the exported files so the repository stays in sync with the live configuration.
 
+The latest exported project snapshot is available as a base64 encoded archive at `convertigo-mcp-export.zip.b64`. Decode it locally
+with `base64 -d convertigo-mcp-export.zip.b64 > convertigo-mcp-export.zip` to obtain the raw Convertigo export.
+
+Create or read/update a ROADMAP.md file to follow steps.
 ### MCP tooling (2025-10-17)
 - `EngineMetrics` is a generic sequence composed of a `SimpleStep` that builds a Rhino object with engine statistics (memory usage, active sessions, worker threads, contexts, request rate, uptime, etc.) and a `JsonToXmlStep` that exposes the data. Call it directly with `http://localhost:8080/convertigo/projects/ConvertigoMCP/.json?__sequence=EngineMetrics`.
 - The URL mapper now forwards `GET /convertigo/api/metrics` to the `EngineMetrics` sequence so tools can retrieve the same JSON payload without running arbitrary scripts.
