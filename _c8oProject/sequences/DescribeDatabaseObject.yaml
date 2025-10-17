@@ -1,0 +1,128 @@
+comment: Describes a database object tree so MCP clients can inspect the logical structure of a project.
+↓describe [steps.SimpleStep-1760700404001]:
+  expression: |
+    var Engine = Packages.com.twinsoft.convertigo.engine.Engine;
+    var CachedIntrospector = Packages.com.twinsoft.convertigo.engine.util.CachedIntrospector;
+    var IEnableAble = Packages.com.twinsoft.convertigo.beans.core.IEnableAble;
+    var response;
+
+    function toMessage(err) {
+      if (!err) {
+        return "Unknown error";
+      }
+      if (err.javaException) {
+        var javaMessage = err.javaException.getMessage();
+        return String(javaMessage != null ? javaMessage : err.javaException.toString());
+      }
+      if (err.message) {
+        return String(err.message);
+      }
+      return String(err);
+    }
+
+    function safeString(value) {
+      return value != null ? String(value) : "";
+    }
+
+    function describeNode(dbo, depth) {
+      var beanInfo = CachedIntrospector.getBeanInfo(dbo);
+      var children = dbo.getDatabaseObjectChildren();
+      var hasChildren = children != null && !children.isEmpty();
+      var node = {
+        qname: String(dbo.getQName()),
+        name: safeString(dbo.getName()),
+        displayName: safeString(dbo.toString()),
+        comment: safeString(dbo.getComment()),
+        category: safeString(dbo.getDatabaseType()),
+        beanClass: String(beanInfo.getBeanDescriptor().getBeanClass().getName()),
+        folderType: String(dbo.getFolderType().name()),
+        priority: Number(dbo.priority),
+        hasChildren: hasChildren,
+        childCount: hasChildren ? children.size() : 0,
+        isEnabled: dbo instanceof IEnableAble ? Boolean(dbo.isEnabled()) : true
+      };
+
+      if (depth > 0 && hasChildren) {
+        var list = [];
+        var iterator = children.iterator();
+        while (iterator.hasNext()) {
+          var child = iterator.next();
+          list.push(describeNode(child, depth - 1));
+        }
+        node.children = list;
+      }
+      return node;
+    }
+
+    function toPositiveInteger(value, fallback) {
+      if (value === null || value === undefined || value === "") {
+        return fallback;
+      }
+      var parsed = parseInt(String(value), 10);
+      if (isNaN(parsed) || parsed < 0) {
+        return fallback;
+      }
+      return parsed;
+    }
+
+    var qnameValue = qname != null ? String(qname) : "";
+    var depthValue = toPositiveInteger(depth, 1);
+
+    try {
+      if (depthValue > 8) {
+        depthValue = 8;
+      }
+      var manager = Engine.theApp.databaseObjectsManager;
+      if (qnameValue) {
+        var dbo = manager.getDatabaseObjectByQName(qnameValue);
+        if (dbo == null) {
+          throw new Packages.com.twinsoft.convertigo.engine.EngineException(
+            "Database object '" + qnameValue + "' cannot be found"
+          );
+        }
+        response = {
+          status: "ok",
+          depth: depthValue,
+          root: describeNode(dbo, depthValue)
+        };
+      } else {
+        var projects = [];
+        var names = manager.getAllProjectNamesList(false);
+        var iterator = names.iterator();
+        while (iterator.hasNext()) {
+          var projectName = String(iterator.next());
+          var project = manager.getProjectByName(projectName);
+          projects.push(describeNode(project, depthValue));
+        }
+        response = {
+          status: "ok",
+          depth: depthValue,
+          projects: projects
+        };
+      }
+    } catch (e) {
+      response = {
+        status: "error",
+        depth: depthValue,
+        qname: qnameValue,
+        message: toMessage(e)
+      };
+    }
+↓result [steps.JsonToXmlStep-1760700404002]:
+  jsonObject:
+    - xmlizable:
+      - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
+      - SmartType:
+        - ↑mode: JS
+        - →→: response
+  key:
+    - xmlizable:
+      - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
+      - SmartType:
+        - ↑mode: PLAIN
+        - →→: response
+↓qname [variables.RequestableVariable-1760700404003]:
+  comment: Optional qualified name of the database object to inspect. When omitted, the sequence describes all projects.
+↓depth [variables.RequestableVariable-1760700404004]:
+  comment: Optional recursion depth for children enumeration (defaults to 1, maximum 8).
+  value: "1"

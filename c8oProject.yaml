@@ -5,5 +5,11 @@
   corsOrigin: =Origin
   httpSessionTimeout: 60
   ↓void [connectors.SqlConnector]: 🗏 connectors/void.yaml
+  ↓EngineMetrics [sequences.GenericSequence]: 🗏 sequences/EngineMetrics.yaml
+  ↓ListProjects [sequences.GenericSequence]: 🗏 sequences/ListProjects.yaml
+  ↓ListProjectSequences [sequences.GenericSequence]: 🗏 sequences/ListProjectSequences.yaml
+  ↓ListDatabaseObjectCandidates [sequences.GenericSequence]: 🗏 sequences/ListDatabaseObjectCandidates.yaml
+  ↓DescribeDatabaseObject [sequences.GenericSequence]: 🗏 sequences/DescribeDatabaseObject.yaml
+  ↓InvokeSequence [sequences.GenericSequence]: 🗏 sequences/InvokeSequence.yaml
   ↓EXEC [sequences.GenericSequence]: 🗏 sequences/EXEC.yaml
   ↓UrlMapper [core.UrlMapper-1760691696817]: 🗏 urlMapper.yaml

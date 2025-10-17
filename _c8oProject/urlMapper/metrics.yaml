@@ -1,0 +1,3 @@
+path: /metrics
+↓GetMetrics [rest.GetOperation]: 
+  targetRequestable: ConvertigoMCP.EngineMetrics
