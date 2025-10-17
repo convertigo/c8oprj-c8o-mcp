@@ -1,0 +1,284 @@
+comment: Creates a new database object under a given parent and optionally applies initial properties.
+↓create [steps.SimpleStep-1760700422001]:
+  expression: |
+    var Engine = Packages.com.twinsoft.convertigo.engine.Engine;
+    var DatabaseObject = Packages.com.twinsoft.convertigo.beans.core.DatabaseObject;
+    var CachedIntrospector = Packages.com.twinsoft.convertigo.engine.util.CachedIntrospector;
+    var JSONObject = Packages.org.json.JSONObject;
+    var JSONArray = Packages.org.json.JSONArray;
+
+    var response;
+
+    function toMessage(err) {
+      if (!err) {
+        return "Unknown error";
+      }
+      if (err.javaException) {
+        var javaMessage = err.javaException.getMessage();
+        return String(javaMessage != null ? javaMessage : err.javaException.toString());
+      }
+      if (err.message) {
+        return String(err.message);
+      }
+      return String(err);
+    }
+
+    function convertPrimitive(type, text) {
+      if (type.equals(Packages.java.lang.Boolean.TYPE)) {
+        return Packages.java.lang.Boolean.valueOf(String(text).toLowerCase() === "true");
+      }
+      if (type.equals(Packages.java.lang.Integer.TYPE)) {
+        return Packages.java.lang.Integer.valueOf(String(text));
+      }
+      if (type.equals(Packages.java.lang.Long.TYPE)) {
+        return Packages.java.lang.Long.valueOf(String(text));
+      }
+      if (type.equals(Packages.java.lang.Short.TYPE)) {
+        return Packages.java.lang.Short.valueOf(String(text));
+      }
+      if (type.equals(Packages.java.lang.Byte.TYPE)) {
+        return Packages.java.lang.Byte.valueOf(String(text));
+      }
+      if (type.equals(Packages.java.lang.Float.TYPE)) {
+        return Packages.java.lang.Float.valueOf(String(text));
+      }
+      if (type.equals(Packages.java.lang.Double.TYPE)) {
+        return Packages.java.lang.Double.valueOf(String(text));
+      }
+      if (type.equals(Packages.java.lang.Character.TYPE)) {
+        var str = String(text);
+        return str.length > 0
+          ? Packages.java.lang.Character.valueOf(str.charAt(0))
+          : Packages.java.lang.Character.valueOf('\u0000');
+      }
+      return null;
+    }
+
+    function convertValue(propertyType, rawValue) {
+      if (rawValue === undefined) {
+        return undefined;
+      }
+      if (rawValue === null) {
+        if (propertyType != null && propertyType.isPrimitive && propertyType.isPrimitive()) {
+          return convertPrimitive(propertyType, "0");
+        }
+        return null;
+      }
+      if (propertyType == null) {
+        return rawValue;
+      }
+      if (propertyType.isEnum && propertyType.isEnum()) {
+        return Packages.java.lang.Enum.valueOf(propertyType, String(rawValue));
+      }
+      if (propertyType.equals(Packages.java.lang.String.class)) {
+        return String(rawValue);
+      }
+      if (propertyType.equals(Packages.java.lang.Boolean.class)) {
+        if (typeof rawValue === 'boolean') {
+          return Packages.java.lang.Boolean.valueOf(rawValue);
+        }
+        return Packages.java.lang.Boolean.valueOf(String(rawValue).toLowerCase() === "true");
+      }
+      if (propertyType.equals(Packages.java.lang.Integer.class)) {
+        return Packages.java.lang.Integer.valueOf(String(rawValue));
+      }
+      if (propertyType.equals(Packages.java.lang.Long.class)) {
+        return Packages.java.lang.Long.valueOf(String(rawValue));
+      }
+      if (propertyType.equals(Packages.java.lang.Short.class)) {
+        return Packages.java.lang.Short.valueOf(String(rawValue));
+      }
+      if (propertyType.equals(Packages.java.lang.Byte.class)) {
+        return Packages.java.lang.Byte.valueOf(String(rawValue));
+      }
+      if (propertyType.equals(Packages.java.lang.Float.class)) {
+        return Packages.java.lang.Float.valueOf(String(rawValue));
+      }
+      if (propertyType.equals(Packages.java.lang.Double.class)) {
+        return Packages.java.lang.Double.valueOf(String(rawValue));
+      }
+      if (propertyType.equals(Packages.java.lang.Character.class)) {
+        var asString = String(rawValue);
+        return asString.length > 0 ? Packages.java.lang.Character.valueOf(asString.charAt(0)) : null;
+      }
+      if (Packages.java.util.List.class.isAssignableFrom(propertyType)) {
+        if (Array.isArray && Array.isArray(rawValue)) {
+          var list = new Packages.java.util.ArrayList();
+          for (var i = 0; i < rawValue.length; i++) {
+            list.add(rawValue[i] != null ? String(rawValue[i]) : null);
+          }
+          return list;
+        }
+        if (rawValue instanceof JSONArray) {
+          var listFromJson = new Packages.java.util.ArrayList();
+          for (var j = 0; j < rawValue.length(); j++) {
+            listFromJson.add(rawValue.isNull(j) ? null : String(rawValue.get(j)));
+          }
+          return listFromJson;
+        }
+      }
+      if (propertyType.equals(Packages.org.json.JSONObject.class) && rawValue instanceof JSONObject) {
+        return rawValue;
+      }
+      if (propertyType.equals(Packages.org.json.JSONArray.class) && rawValue instanceof JSONArray) {
+        return rawValue;
+      }
+      if (propertyType.isPrimitive && propertyType.isPrimitive()) {
+        return convertPrimitive(propertyType, rawValue);
+      }
+      return rawValue;
+    }
+
+    function applyInitialProperties(dbo, payloadText) {
+      if (!payloadText) {
+        return { applied: [], failed: [] };
+      }
+      var updates;
+      try {
+        updates = JSON.parse(payloadText);
+      } catch (parseError) {
+        throw new Packages.java.lang.IllegalArgumentException("Invalid JSON payload: " + parseError.message);
+      }
+      if (updates === null || typeof updates !== 'object' || Array.isArray(updates)) {
+        throw new Packages.java.lang.IllegalArgumentException("JSON payload must be an object with property names");
+      }
+      var beanInfo = CachedIntrospector.getBeanInfo(dbo);
+      var descriptors = beanInfo.getPropertyDescriptors();
+      var descriptorMap = {};
+      for (var i = 0; i < descriptors.length; i++) {
+        var descriptor = descriptors[i];
+        if (descriptor != null) {
+          descriptorMap[String(descriptor.getName())] = descriptor;
+        }
+      }
+      var applied = [];
+      var failed = [];
+      for (var key in updates) {
+        if (!Object.prototype.hasOwnProperty.call(updates, key)) {
+          continue;
+        }
+        var descriptor = descriptorMap[key];
+        if (!descriptor) {
+          failed.push({ name: key, message: "Unknown property" });
+          continue;
+        }
+        var writeMethod = descriptor.getWriteMethod();
+        if (writeMethod == null) {
+          failed.push({ name: key, message: "Property is read-only" });
+          continue;
+        }
+        var propertyType = descriptor.getPropertyType();
+        var rawValue = updates[key];
+        var converted;
+        try {
+          converted = rawValue === null ? null : convertValue(propertyType, rawValue);
+        } catch (conversionError) {
+          failed.push({ name: key, message: toMessage(conversionError) });
+          continue;
+        }
+        try {
+          if (converted === undefined) {
+            continue;
+          }
+          if (converted === null && propertyType != null && propertyType.isPrimitive && propertyType.isPrimitive()) {
+            failed.push({ name: key, message: "Cannot assign null to primitive property" });
+            continue;
+          }
+          writeMethod.invoke(dbo, converted);
+          applied.push(key);
+        } catch (applyError) {
+          failed.push({ name: key, message: toMessage(applyError) });
+        }
+      }
+      return { applied: applied, failed: failed };
+    }
+
+    var parentQName = parent != null ? String(parent) : "";
+    var classNameValue = className != null ? String(className) : "";
+    var nameValue = newName != null ? String(newName) : "";
+    var propertiesText = properties != null ? String(properties) : "";
+
+    try {
+      if (!parentQName) {
+        throw new Packages.java.lang.IllegalArgumentException("Missing 'parent' variable");
+      }
+      if (!classNameValue) {
+        throw new Packages.java.lang.IllegalArgumentException("Missing 'className' variable");
+      }
+
+      var manager = Engine.theApp.databaseObjectsManager;
+      var parentDbo = manager.getDatabaseObjectByQName(parentQName);
+      if (parentDbo == null) {
+        throw new Packages.com.twinsoft.convertigo.engine.EngineException(
+          "Database object '" + parentQName + "' cannot be found"
+        );
+      }
+
+      var beanClass = Packages.java.lang.Class.forName(classNameValue);
+      if (!Packages.com.twinsoft.convertigo.beans.core.DatabaseObject.class.isAssignableFrom(beanClass)) {
+        throw new Packages.java.lang.IllegalArgumentException(
+          "Class '" + classNameValue + "' is not a DatabaseObject"
+        );
+      }
+
+      var ctor = beanClass.getDeclaredConstructor();
+      ctor.setAccessible(true);
+      var newDbo = ctor.newInstance();
+      newDbo.bNew = true;
+      newDbo.hasChanged = true;
+
+      if (nameValue) {
+        newDbo.setName(nameValue);
+      }
+
+      var propertyResult = applyInitialProperties(newDbo, propertiesText);
+
+      parentDbo.add(newDbo);
+      newDbo.priority = newDbo.getNewOrderValue();
+
+      var project = newDbo.getProject();
+      parentDbo.hasChanged = true;
+      if (project != null) {
+        project.hasChanged = true;
+        Engine.theApp.databaseObjectsManager.exportProject(project);
+      }
+
+      response = {
+        status: propertyResult.failed.length === 0 ? "ok" : (propertyResult.applied.length > 0 ? "partial" : "error"),
+        parent: parentQName,
+        className: classNameValue,
+        qname: String(newDbo.getQName()),
+        name: String(newDbo.getName()),
+        folderType: String(newDbo.getFolderType().name()),
+        appliedProperties: propertyResult.applied,
+        failedProperties: propertyResult.failed
+      };
+    } catch (e) {
+      response = {
+        status: "error",
+        parent: parentQName,
+        className: classNameValue,
+        message: toMessage(e)
+      };
+    }
+↓result [steps.JsonToXmlStep-1760700422002]:
+  jsonObject:
+    - xmlizable:
+      - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
+      - SmartType:
+        - ↑mode: JS
+        - →→: response
+  key:
+    - xmlizable:
+      - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
+      - SmartType:
+        - ↑mode: PLAIN
+        - →→: response
+↓parent [variables.RequestableVariable-1760700422003]:
+  comment: Qualified name of the parent database object that will own the new object.
+↓className [variables.RequestableVariable-1760700422004]:
+  comment: Fully qualified Java class name of the database object to instantiate.
+↓newName [variables.RequestableVariable-1760700422005]:
+  comment: Optional explicit name for the new database object.
+↓properties [variables.RequestableVariable-1760700422006]:
+  comment: Optional JSON payload describing property values to set before export.

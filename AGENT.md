@@ -76,6 +76,21 @@ Convertigo accepts these changes without a server restart. Remember to commit th
 ### MCP tooling (2025-10-17)
 - `EngineMetrics` is a generic sequence composed of a `SimpleStep` that builds a Rhino object with engine statistics (memory usage, active sessions, worker threads, contexts, request rate, uptime, etc.) and a `JsonToXmlStep` that exposes the data. Call it directly with `http://localhost:8080/convertigo/projects/ConvertigoMCP/.json?__sequence=EngineMetrics`.
 - The URL mapper now forwards `GET /convertigo/api/metrics` to the `EngineMetrics` sequence so tools can retrieve the same JSON payload without running arbitrary scripts.
+- `ListProjects` exposes the set of Convertigo projects through `GET /convertigo/api/mcp/projects` (or the direct sequence call `...__sequence=ListProjects`).
+- `ListProjectSequences` returns the requestables of a given project. Call it with `GET /convertigo/api/mcp/sequences?project=ConvertigoMCP` to obtain names, comments, and class names.
+- `DescribeDatabaseObject` surfaces the logical tree of a project or a specific database object. Call `GET /convertigo/api/mcp/tree?depth=2` to expand two levels, or add `qname=<project.qname>` to target a single branch.
+- `ListDatabaseObjectCandidates` mirrors the Studio palette to reveal which database object classes can be added under a parent. Invoke it with `GET /convertigo/api/mcp/candidates?qname=<dbo.qname>&folder=<optional-folder-shortname>`.
+- `InvokeSequence` wraps the internal requester so MCP clients can execute sequences without `/api/exec`. Use `POST /convertigo/api/mcp/sequences/invoke` with a JSON `payload` string to forward variables.
+- `GetDatabaseObjectProperties` (→ `GET /convertigo/api/mcp/properties?qname=<dbo.qname>`) returns property descriptors, types, and current values so the MCP client can render an editor safely.
+- `UpdateDatabaseObjectProperties` (→ `POST /convertigo/api/mcp/properties/update`) accepts a JSON object mapping property names to values, validates conversions, applies the setters, and exports the project on success.
+- `CreateDatabaseObject` (→ `POST /convertigo/api/mcp/objects`) instantiates a database object class under a parent, optionally applies initial properties, and exports the containing project.
+- `ReorderDatabaseObjects` (→ `POST /convertigo/api/mcp/objects/reorder`) reassigns sibling priorities according to the supplied list of qnames and persists the ordering.
+- Next targets for the MCP tooling are documented in `ROADMAP.md`: shape the MCP contract (schemas, guardrails) so clients can drive these new endpoints confidently.
+
+## Git workflow tips (2024-10-17)
+- Before running `make_pr`, make sure the branch is aligned with the upstream repository. If a previous PR was already merged, run `git fetch origin` followed by `git rebase origin/main` (or the relevant target branch) so the new diff is computed on top of the latest state.
+- When Codex Cloud reports merge conflicts during the PR creation step, abort the PR, synchronize the branch with the commands above, resolve any conflicts locally, then rerun `make_pr`.
+- If the workspace becomes out of sync with the remote state and you only need the latest files, you can reset the branch with `git fetch origin && git reset --hard origin/main`. This discards local commits, so ensure important work has been exported first.
 
 ## Environment notes (2024-10-17)
 - The workspace initially lacks the `docker` CLI but `apt-get install docker.io` succeeds. However, starting the daemon fails inside this container: `dockerd` exits with `failed to start daemon: ... iptables v1.8.10 (nf_tables): Could not fetch rule set generation id: Permission denied`. This indicates missing kernel capabilities (e.g., `CAP_NET_ADMIN`) so Docker cannot be used even after installation.

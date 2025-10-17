@@ -30,4 +30,49 @@ curl "http://localhost:8080/convertigo/api/exec" \
 # Retrieve live engine metrics (SimpleStep + JsonToXmlStep sequence)
 curl "http://localhost:8080/convertigo/projects/ConvertigoMCP/.json?__sequence=EngineMetrics"
 curl "http://localhost:8080/convertigo/api/metrics"
+
+# Discover projects and sequences exposed through the MCP facade
+curl "http://localhost:8080/convertigo/api/mcp/projects"
+curl "http://localhost:8080/convertigo/api/mcp/sequences?project=ConvertigoMCP"
+curl "http://localhost:8080/convertigo/api/mcp/tree?depth=2"
+curl "http://localhost:8080/convertigo/api/mcp/tree?qname=ConvertigoMCP&depth=1"
+curl "http://localhost:8080/convertigo/api/mcp/candidates?qname=ConvertigoMCP&folder=st"
+curl "http://localhost:8080/convertigo/api/mcp/properties?qname=ConvertigoMCP"
+curl "http://localhost:8080/convertigo/api/mcp/properties/update" \
+  -X POST \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "qname=ConvertigoMCP" \
+  --data-urlencode 'properties={"comment":"Updated via MCP"}'
+curl "http://localhost:8080/convertigo/api/mcp/objects" \
+  -X POST \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "parent=ConvertigoMCP" \
+  --data-urlencode "className=com.twinsoft.convertigo.beans.core.UrlMapper" \
+  --data-urlencode "newName=MyMapper" \
+  --data-urlencode 'properties={"comment":"Created by MCP"}'
+curl "http://localhost:8080/convertigo/api/mcp/objects/reorder" \
+  -X POST \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "parent=ConvertigoMCP" \
+  --data-urlencode 'order=["ConvertigoMCP.UrlMapper","ConvertigoMCP.ListProjects"]'
+
+# Invoke a sequence safely through the MCP facade (POST body contains form data or JSON payload parameter)
+curl "http://localhost:8080/convertigo/api/mcp/sequences/invoke" \
+  -X POST \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "project=ConvertigoMCP" \
+  --data-urlencode "sequence=EngineMetrics" \
+  --data-urlencode "payload={}" 
+
+```
+
+## Git tips
+- Codex Cloud does not automatically sync with the remote repository after a PR merges. Before running `make_pr`, execute `git fetch origin` followed by `git rebase origin/main` (replace `main` with the actual default branch) so your changes apply cleanly.
+- If `make_pr` reports merge conflicts, cancel it, rebase or reset the branch against the updated remote as described above, resolve conflicts locally, then rerun the command.
+
+## MCP capability targets
+- MCP dialogue must eventually expose project discovery, sequence listing/invocation, DatabaseObject exploration, property read/write, allowed child type discovery, object creation, and reordering.
+- Property inspection lives at `/convertigo/api/mcp/properties` and updates at `/convertigo/api/mcp/properties/update`; object creation is available through `/convertigo/api/mcp/objects` and reordering through `/convertigo/api/mcp/objects/reorder`.
+- Each capability should be provided through dedicated sequences and URL mapper endpoints so the MCP client never needs raw `/convertigo/api/exec` access.
+- Use Rhino-based `SimpleStep` blocks inside sequences to manipulate `Engine.theApp.databaseObjectsManager` and export changes with `Engine.theApp.databaseObjectsManager.exportProject(project);` once modifications are ready for Git.
 ```

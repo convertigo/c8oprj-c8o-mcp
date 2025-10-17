@@ -1,0 +1,270 @@
+comment: Lists database object types that can be created under a given parent database object.
+↓buildCandidates [steps.SimpleStep-1760700410001]:
+  expression: |
+    var Engine = Packages.com.twinsoft.convertigo.engine.Engine;
+    var DatabaseObjectsManager = Packages.com.twinsoft.convertigo.engine.DatabaseObjectsManager;
+    var DatabaseObject = Packages.com.twinsoft.convertigo.beans.core.DatabaseObject;
+    var FolderType = Packages.com.twinsoft.convertigo.engine.enums.FolderType;
+    var Sequence = Packages.com.twinsoft.convertigo.beans.core.Sequence;
+    var NgxApplicationComponent = Packages.com.twinsoft.convertigo.beans.ngx.components.ApplicationComponent;
+    var MobileApplicationComponent = Packages.com.twinsoft.convertigo.beans.mobile.components.ApplicationComponent;
+    var ComponentManager = Packages.com.twinsoft.convertigo.beans.ngx.components.dynamic.ComponentManager;
+    var MySimpleBeanInfo = Packages.com.twinsoft.convertigo.beans.core.MySimpleBeanInfo;
+    var BeanInfo = Packages.java.beans.BeanInfo;
+
+    var response;
+
+    function toMessage(err) {
+      if (!err) {
+        return "Unknown error";
+      }
+      if (err.javaException) {
+        var javaMessage = err.javaException.getMessage();
+        return String(javaMessage != null ? javaMessage : err.javaException.toString());
+      }
+      if (err.message) {
+        return String(err.message);
+      }
+      return String(err);
+    }
+
+    function safeString(value) {
+      return value != null ? String(value) : "";
+    }
+
+    function parseFolderType(value) {
+      if (!value) {
+        return null;
+      }
+      var parsed = FolderType.parse(String(value));
+      if (parsed == null) {
+        throw new Packages.com.twinsoft.convertigo.engine.EngineException(
+          "Unknown folder type '" + value + "'"
+        );
+      }
+      return parsed;
+    }
+
+    function describeFolderType(folderType) {
+      if (folderType == null) {
+        return null;
+      }
+      return {
+        name: String(folderType.name()),
+        shortName: safeString(folderType.shortName()),
+        displayName: safeString(folderType.displayName())
+      };
+    }
+
+    function describeParent(dbo) {
+      if (dbo == null) {
+        return null;
+      }
+      var parentInfo = {
+        qname: String(dbo.getQName()),
+        name: safeString(dbo.getName()),
+        className: String(dbo.getClass().getName()),
+        displayName: safeString(dbo.toString())
+      };
+      var folderType = DatabaseObject.getFolderType(dbo.getClass());
+      if (folderType != null) {
+        parentInfo.folderType = describeFolderType(folderType);
+      }
+      return parentInfo;
+    }
+
+    function buildPalette(parentDbo, folderType) {
+      var categories = [];
+      var explorerManager = Engine.theApp.getDboExplorerManager();
+      var groups = explorerManager.getGroups();
+      var groupIterator = groups.iterator();
+      while (groupIterator.hasNext()) {
+        var group = groupIterator.next();
+        var groupName = safeString(group.getName());
+        var categoryIterator = group.getCategories().iterator();
+        while (categoryIterator.hasNext()) {
+          var category = categoryIterator.next();
+          var categoryName = safeString(category.getName());
+          if (!categoryName) {
+            categoryName = groupName;
+          }
+          var beansIterator = category.getBeans().iterator();
+          while (beansIterator.hasNext()) {
+            var beansCategory = beansIterator.next();
+            var finalCategoryName = safeString(beansCategory.getName());
+            if (!finalCategoryName) {
+              finalCategoryName = categoryName;
+            }
+            var items = [];
+            var beanIterator = beansCategory.getBeans().iterator();
+            while (beanIterator.hasNext()) {
+              var bean = beanIterator.next();
+              var className = String(bean.getClassName());
+              if ((className.indexOf("com.twinsoft.convertigo.beans.ngx.components.") === 0
+                    || className.indexOf("com.twinsoft.convertigo.beans.mobile.components.") === 0)
+                  && !className.endsWith("PageComponent")) {
+                continue;
+              }
+              var isAllowed = false;
+              try {
+                if (parentDbo != null) {
+                  var force = false;
+                  if (parentDbo instanceof Sequence) {
+                    force = className.indexOf("com.twinsoft.convertigo.beans.steps.") === 0
+                      || className.indexOf("com.twinsoft.convertigo.beans.variables.Step") === 0;
+                  } else if (NgxApplicationComponent != null && parentDbo instanceof NgxApplicationComponent) {
+                    force = className.indexOf("com.twinsoft.convertigo.beans.ngx.") === 0;
+                  } else if (MobileApplicationComponent != null && parentDbo instanceof MobileApplicationComponent) {
+                    force = className.indexOf("com.twinsoft.convertigo.beans.mobile.") === 0;
+                  }
+                  isAllowed = force || DatabaseObjectsManager.checkParent(parentDbo.getClass(), bean);
+                  if (isAllowed && folderType != null) {
+                    var beanClass = Packages.java.lang.Class.forName(className);
+                    var beanFolderType = DatabaseObject.getFolderType(beanClass);
+                    isAllowed = beanFolderType != null && beanFolderType.equals(folderType);
+                  }
+                }
+              } catch (e) {
+                isAllowed = false;
+              }
+              if (!isAllowed) {
+                continue;
+              }
+              try {
+                var beanInfoClass = Packages.java.lang.Class.forName(className + "BeanInfo");
+                var beanInfo = beanInfoClass.getConstructor().newInstance();
+                var beanDescriptor = beanInfo.getBeanDescriptor();
+                var description = bean.isDocumented()
+                  ? safeString(beanDescriptor.getShortDescription())
+                  : "Not yet documented |";
+                var icon = safeString(MySimpleBeanInfo.getIconName(beanInfo, BeanInfo.ICON_COLOR_32x32));
+                items.push({
+                  type: "dbo",
+                  id: className,
+                  name: safeString(beanDescriptor.getDisplayName()),
+                  classname: className,
+                  description: description,
+                  icon: icon,
+                  builtin: true,
+                  additional: false
+                });
+              } catch (creationError) {
+              }
+            }
+            if (items.length > 0) {
+              categories.push({
+                type: "category",
+                name: finalCategoryName,
+                items: items
+              });
+            }
+          }
+        }
+      }
+
+      try {
+        var ngxManager = ComponentManager.of(parentDbo);
+        if (ngxManager != null) {
+          var ngxGroups = ngxManager.getGroups();
+          var ngxComponents = ngxManager.getComponents();
+          var groupIt = ngxGroups.iterator();
+          while (groupIt.hasNext()) {
+            var ngxGroup = String(groupIt.next());
+            var ngxItems = [];
+            var compIt = ngxComponents.iterator();
+            while (compIt.hasNext()) {
+              var component = compIt.next();
+              if (String(component.getGroup()) !== ngxGroup) {
+                continue;
+              }
+              var className = "";
+              try {
+                var beanInstance = ngxManager.createBean(component);
+                className = beanInstance != null ? safeString(beanInstance.getClass().getCanonicalName()) : "";
+              } catch (componentError) {
+              }
+              var allowed = parentDbo != null ? component.isAllowedIn(parentDbo) : false;
+              if (allowed && folderType != null) {
+                try {
+                  var beanClass = Packages.java.lang.Class.forName(className);
+                  var beanFolderType = DatabaseObject.getFolderType(beanClass);
+                  allowed = beanFolderType != null && beanFolderType.equals(folderType);
+                } catch (folderError) {
+                  allowed = false;
+                }
+              }
+              if (!allowed) {
+                continue;
+              }
+              ngxItems.push({
+                type: "ion",
+                id: "ngx " + safeString(component.getName()),
+                name: safeString(component.getLabel()),
+                classname: className,
+                description: safeString(component.getDescription()),
+                icon: safeString(component.getImagePath()),
+                builtin: Boolean(component.isBuiltIn()),
+                additional: Boolean(component.isAdditional())
+              });
+            }
+            if (ngxItems.length > 0) {
+              categories.push({
+                type: "category",
+                name: ngxGroup,
+                items: ngxItems
+              });
+            }
+          }
+        }
+      } catch (ngxError) {
+      }
+
+      return categories;
+    }
+
+    try {
+      var requestedQName = qname != null ? String(qname) : "";
+      if (!requestedQName) {
+        throw new Packages.com.twinsoft.convertigo.engine.EngineException(
+          "Parameter 'qname' is required"
+        );
+      }
+      var folderCode = folder != null ? String(folder) : "";
+      var folderType = parseFolderType(folderCode);
+      var parentDbo = Engine.theApp.databaseObjectsManager.getDatabaseObjectByQName(requestedQName);
+      if (parentDbo == null) {
+        throw new Packages.com.twinsoft.convertigo.engine.EngineException(
+          "Database object '" + requestedQName + "' cannot be found"
+        );
+      }
+      response = {
+        status: "ok",
+        parent: describeParent(parentDbo),
+        folderType: describeFolderType(folderType),
+        categories: buildPalette(parentDbo, folderType)
+      };
+    } catch (e) {
+      response = {
+        status: "error",
+        message: toMessage(e),
+        qname: qname != null ? String(qname) : "",
+        folder: folder != null ? String(folder) : ""
+      };
+    }
+↓result [steps.JsonToXmlStep-1760700410002]:
+  jsonObject:
+    - xmlizable:
+      - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
+      - SmartType:
+        - ↑mode: JS
+        - →→: response
+  key:
+    - xmlizable:
+      - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
+      - SmartType:
+        - ↑mode: PLAIN
+        - →→: response
+↓qname [variables.RequestableVariable-1760700410003]:
+  comment: Qualified name of the parent database object where new children may be created.
+↓folder [variables.RequestableVariable-1760700410004]:
+  comment: Optional folder short name (see FolderType.shortName()) to limit results to a specific child folder.
