@@ -1,0 +1,31 @@
+comment: Lists available Convertigo projects and their metadata for MCP tooling.
+↓buildProjects [steps.SimpleStep-1760700400001]:
+  expression: |
+    var Engine = Packages.com.twinsoft.convertigo.engine.Engine;
+    var manager = Engine.theApp.databaseObjectsManager;
+    var names = manager.getAllProjectNamesList(false);
+    var iterator = names.iterator();
+    var items = [];
+    while (iterator.hasNext()) {
+      var projectName = String(iterator.next());
+      items.push({
+        name: projectName
+      });
+    }
+    response = {
+      status: "ok",
+      projects: items
+    };
+↓output [steps.JsonToXmlStep-1760700400002]:
+  jsonObject:
+    - xmlizable:
+      - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
+      - SmartType:
+        - ↑mode: JS
+        - →→: response
+  key:
+    - xmlizable:
+      - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
+      - SmartType:
+        - ↑mode: PLAIN
+        - →→: response
