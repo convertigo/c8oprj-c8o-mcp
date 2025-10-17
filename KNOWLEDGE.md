@@ -75,3 +75,4 @@ curl "http://localhost:8080/convertigo/api/mcp/sequences/invoke" \
 - Property inspection lives at `/convertigo/api/mcp/properties` and updates at `/convertigo/api/mcp/properties/update`; object creation is available through `/convertigo/api/mcp/objects` and reordering through `/convertigo/api/mcp/objects/reorder`.
 - Each capability should be provided through dedicated sequences and URL mapper endpoints so the MCP client never needs raw `/convertigo/api/exec` access.
 - Use Rhino-based `SimpleStep` blocks inside sequences to manipulate `Engine.theApp.databaseObjectsManager` and export changes with `Engine.theApp.databaseObjectsManager.exportProject(project);` once modifications are ready for Git.
+```
