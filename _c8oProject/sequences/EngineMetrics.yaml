@@ -1,0 +1,47 @@
+comment: Returns runtime metrics about the Convertigo engine.
+↓buildMetrics [steps.SimpleStep-1760698385563]: 
+  expression: |
+    var runtime = java.lang.Runtime.getRuntime();
+    var Engine = Packages.com.twinsoft.convertigo.engine.Engine;
+    var EngineStatistics = Packages.com.twinsoft.convertigo.engine.EngineStatistics;
+    var RequestableObject = Packages.com.twinsoft.convertigo.beans.core.RequestableObject;
+    var HttpSessionListener = Packages.com.twinsoft.convertigo.engine.requesters.HttpSessionListener;
+    var KeyManager = Packages.com.twinsoft.tas.KeyManager;
+    var Session = Packages.com.twinsoft.api.Session;
+    var mb = 1024 * 1024;
+    var memoryTotal = runtime.totalMemory();
+    var sessionCount = HttpSessionListener.countSessions();
+    var sessionMaxCV = KeyManager.getMaxCV(Session.EmulIDSE);
+    var contexts = 0;
+    try {
+      contexts = Engine.isStarted ? Engine.theApp.contextManager.getNumberOfContexts() : 0;
+    } catch (e) {
+      contexts = 0;
+    }
+    var metrics = {
+      memoryMaximal: Math.floor(runtime.maxMemory() / mb),
+      memoryTotal: Math.floor(memoryTotal / mb),
+      memoryUsed: Math.floor((memoryTotal - runtime.freeMemory()) / mb),
+      threads: RequestableObject.nbCurrentWorkerThreads,
+      sessions: sessionCount,
+      sessionMaxCV: sessionMaxCV,
+      availableSessions: sessionMaxCV - sessionCount,
+      contexts: contexts,
+      requests: Math.max(EngineStatistics.getAverage(EngineStatistics.REQUEST), 0),
+      engineState: Engine.isStarted,
+      startTime: Engine.startStopDate,
+      time: java.lang.System.currentTimeMillis()
+    };
+↓metrics [steps.JsonToXmlStep-1760698385565]: 
+  jsonObject: 
+    - xmlizable: 
+      - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
+      - SmartType: 
+        - ↑mode: JS
+        - →→: metrics
+  key: 
+    - xmlizable: 
+      - ↑classname: com.twinsoft.convertigo.beans.steps.SmartType
+      - SmartType: 
+        - ↑mode: PLAIN
+        - →→: metrics
