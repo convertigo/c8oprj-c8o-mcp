@@ -48,6 +48,10 @@ curl "http://localhost:8080/convertigo/api/mcp/sequences/invoke" \
 
 ```
 
+## Git tips
+- Codex Cloud does not automatically sync with the remote repository after a PR merges. Before running `make_pr`, execute `git fetch origin` followed by `git rebase origin/main` (replace `main` with the actual default branch) so your changes apply cleanly.
+- If `make_pr` reports merge conflicts, cancel it, rebase or reset the branch against the updated remote as described above, resolve conflicts locally, then rerun the command.
+
 ## MCP capability targets
 - MCP dialogue must eventually expose project discovery, sequence listing/invocation, DatabaseObject exploration, property read/write, allowed child type discovery, object creation, and reordering.
 - Each capability should be provided through dedicated sequences and URL mapper endpoints so the MCP client never needs raw `/convertigo/api/exec` access.

@@ -83,6 +83,11 @@ Convertigo accepts these changes without a server restart. Remember to commit th
 - `InvokeSequence` wraps the internal requester so MCP clients can execute sequences without `/api/exec`. Use `POST /convertigo/api/mcp/sequences/invoke` with a JSON `payload` string to forward variables.
 - Next targets for the MCP tooling are documented in `ROADMAP.md`: listing projects and sequences, invoking requestables, browsing the DatabaseObject tree, reading/writing properties, creating/reordering objects, and exposing these capabilities through URL mapper endpoints compatible with the MCP dialogue.
 
+## Git workflow tips (2024-10-17)
+- Before running `make_pr`, make sure the branch is aligned with the upstream repository. If a previous PR was already merged, run `git fetch origin` followed by `git rebase origin/main` (or the relevant target branch) so the new diff is computed on top of the latest state.
+- When Codex Cloud reports merge conflicts during the PR creation step, abort the PR, synchronize the branch with the commands above, resolve any conflicts locally, then rerun `make_pr`.
+- If the workspace becomes out of sync with the remote state and you only need the latest files, you can reset the branch with `git fetch origin && git reset --hard origin/main`. This discards local commits, so ensure important work has been exported first.
+
 ## Environment notes (2024-10-17)
 - The workspace initially lacks the `docker` CLI but `apt-get install docker.io` succeeds. However, starting the daemon fails inside this container: `dockerd` exits with `failed to start daemon: ... iptables v1.8.10 (nf_tables): Could not fetch rule set generation id: Permission denied`. This indicates missing kernel capabilities (e.g., `CAP_NET_ADMIN`) so Docker cannot be used even after installation.
 - When Docker is unavailable, use the Tomcat+WAR procedure above to run Convertigo locally on port 8080.
